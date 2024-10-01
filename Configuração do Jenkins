@@ -1,0 +1,61 @@
+pipeline {
+    agent any
+
+    environment {
+        REGISTRY_URL = 'Docker'
+        IMAGE_NAME = 'Jenkins'
+        IMAGE_TAG = 'latest'
+        DEPLOY_SERVER = 'maxseccyber@seu-servidor.com'
+        DEPLOY_PATH = '/caminho/do/deploy'
+    }
+
+    stages {
+        stage('Build') {
+            steps {
+                script {
+                    // Constrói a imagem Docker
+                    sh 'docker build -t $REGISTRY_URL/$IMAGE_NAME:$IMAGE_TAG .'
+                }
+            }
+        }
+
+        stage('Login to Registry') {
+            steps {
+                script {
+                    // Faz login no registro privado
+                    sh 'echo "$DOCKER_PASSWORD" | docker login $REGISTRY_URL -u "$DOCKER_USERNAME" --password-stdin'
+                }
+            }
+        }
+
+        stage('Push Image') {
+            steps {
+                script {
+                    // Envia a imagem para o registro privado
+                    sh 'docker push $REGISTRY_URL/$IMAGE_NAME:$IMAGE_TAG'
+                }
+            }
+        }
+
+        stage('Deploy') {
+            steps {
+                script {
+                    // Faz deploy da imagem no servidor externo
+                    sh """
+                    ssh $DEPLOY_SERVER 'docker pull $REGISTRY_URL/$IMAGE_NAME:$IMAGE_TAG && \
+                    docker run -d -p 80:80 $REGISTRY_URL/$IMAGE_NAME:$IMAGE_TAG'
+                    """
+                }
+            }
+        }
+    }
+
+    post {
+        success {
+            echo 'Deploy realizado com sucesso!'
+        }
+        failure {
+            echo 'Falha no pipeline!'
+        }
+    }
+}
